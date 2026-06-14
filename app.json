@@ -7,6 +7,16 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0F172A",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/28c6aba9-aee0-4854-b078-847e60f9b02e"
+    },
+    "plugins": [
+      "expo-splash-screen"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.wilsonangga.catatankeuangan",
@@ -21,7 +31,10 @@
     "android": {
       "package": "com.wilsonangga.catatankeuangan",
       "usesCleartextTraffic": true,
-      "permissions": ["CAMERA"],
+      "permissions": [
+        "CAMERA",
+        "CAMERA"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png",

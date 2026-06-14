@@ -53,6 +53,31 @@ export const api = {
     const qs = q.toString();
     return request<Expense[]>(`/expenses${qs ? `?${qs}` : ""}`);
   },
+  listExpensesPaged: async (params: {
+    from?: string;
+    to?: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ items: Expense[]; total: number }> => {
+    const { serverUrl, apiKey } = await loadSettings();
+    if (!serverUrl) throw new Error("Server URL not configured. Open Settings.");
+    const q = new URLSearchParams();
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    q.set("limit", String(params.limit));
+    q.set("offset", String(params.offset));
+    const res = await fetch(
+      `${serverUrl.replace(/\/$/, "")}/expenses?${q.toString()}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as any).error || `Request failed (${res.status})`);
+    }
+    const items = (await res.json()) as Expense[];
+    const total = Number(res.headers.get("X-Total-Count")) || items.length;
+    return { items, total };
+  },
   addExpense: (e: {
     amount: number;
     category: string;

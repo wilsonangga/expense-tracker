@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Pressable,
   Modal,
@@ -18,12 +18,15 @@ import type { Expense, Category } from "../types";
 import { theme } from "../theme";
 import { DateField } from "../components/DateField";
 import { ReceiptScanModal } from "../components/ReceiptScanModal";
+import { LoadingDots } from "../components/LoadingDots";
 
 const formatAmountInput = (raw: string) => {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return "";
   return Number(digits).toLocaleString("id-ID");
 };
+
+const PAGE_SIZE = 50;
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = [
@@ -51,15 +54,25 @@ function prettyDate(iso: string) {
 }
 
 export function ExpensesScreen() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [view, setView] = useState<"daily" | "category">("daily");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
+
+  // ----- Daily view: paginated (infinite scroll) -----
+  const [dailyItems, setDailyItems] = useState<Expense[]>([]);
+  const [dailyOffset, setDailyOffset] = useState(0);
+  const [dailyTotal, setDailyTotal] = useState(0);
+  const [loading, setLoading] = useState(false); // initial load / refresh
+  const [loadingMore, setLoadingMore] = useState(false);
+  const dailyHasMore = dailyItems.length < dailyTotal;
+
+  // ----- Category view: fetched only for the selected month range -----
+  const [catItems, setCatItems] = useState<Expense[]>([]);
+  const [catLoading, setCatLoading] = useState(false);
 
   // month range for the category view ("YYYY-MM" strings, inclusive)
   const thisMonth = new Date().toISOString().slice(0, 7);
@@ -75,29 +88,75 @@ export function ExpensesScreen() {
   const [category, setCategory] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
+  // Initial load: categories + first page of expenses (newest first).
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [exp, cats] = await Promise.all([
-        api.listExpenses(),
+      const [page, cats] = await Promise.all([
+        api.listExpensesPaged({ limit: PAGE_SIZE, offset: 0 }),
         api.listCategories(),
       ]);
-      setExpenses(exp);
+      setDailyItems(page.items);
+      setDailyOffset(page.items.length);
+      setDailyTotal(page.total);
       setCategories(cats);
-      if (!category && cats.length) setCategory(cats[0].name);
+      setCategory((cur) => cur || (cats.length ? cats[0].name : ""));
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [category]);
+  }, []);
+
+  // Append the next page when the user scrolls to the bottom.
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loading) return;
+    if (dailyItems.length >= dailyTotal) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.listExpensesPaged({
+        limit: PAGE_SIZE,
+        offset: dailyOffset,
+      });
+      setDailyItems((prev) => [...prev, ...page.items]);
+      setDailyOffset((o) => o + page.items.length);
+      setDailyTotal(page.total);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, loading, dailyItems.length, dailyTotal, dailyOffset]);
+
+  // Category view loads only the selected month range (bounded).
+  const loadCategory = useCallback(async () => {
+    setCatLoading(true);
+    setError(null);
+    try {
+      const items = await api.listExpenses({
+        from: `${rangeFrom}-01`,
+        to: `${rangeTo}-31`,
+      });
+      setCatItems(items);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setCatLoading(false);
+    }
+  }, [rangeFrom, rangeTo]);
 
   useFocusEffect(
     useCallback(() => {
       load();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [load]),
   );
+
+  // Refetch category data when range or view changes.
+  useEffect(() => {
+    if (view === "category") loadCategory();
+  }, [view, loadCategory]);
 
   const openAdd = () => {
     setEditing(null);
@@ -141,6 +200,7 @@ export function ExpensesScreen() {
       setNote("");
       setDate("");
       load();
+      if (view === "category") loadCategory();
     } catch (e: any) {
       Alert.alert("Error", e.message);
     } finally {
@@ -160,7 +220,9 @@ export function ExpensesScreen() {
           onPress: async () => {
             try {
               await api.deleteExpense(e.id);
-              setExpenses((prev) => prev.filter((x) => x.id !== e.id));
+              setDailyItems((prev) => prev.filter((x) => x.id !== e.id));
+              setCatItems((prev) => prev.filter((x) => x.id !== e.id));
+              setDailyTotal((t) => Math.max(0, t - 1));
             } catch (err: any) {
               Alert.alert("Error", err.message);
             }
@@ -178,15 +240,15 @@ export function ExpensesScreen() {
   const today = new Date().toISOString().slice(0, 10);
   const todayTotal = useMemo(
     () =>
-      expenses
+      dailyItems
         .filter((e) => e.date === today)
         .reduce((s, e) => s + e.amount, 0),
-    [expenses, today],
+    [dailyItems, today],
   );
 
   const dayGroups = useMemo(() => {
     const map = new Map<string, { total: number; items: Expense[] }>();
-    for (const e of expenses) {
+    for (const e of dailyItems) {
       const g = map.get(e.date) || { total: 0, items: [] };
       g.total += e.amount;
       g.items.push(e);
@@ -195,13 +257,10 @@ export function ExpensesScreen() {
     return [...map.entries()]
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
       .map(([date, g]) => ({ date, ...g }));
-  }, [expenses]);
+  }, [dailyItems]);
 
   const catGroups = useMemo(() => {
-    const inRange = expenses.filter((e) => {
-      const m = e.date.slice(0, 7);
-      return m >= rangeFrom && m <= rangeTo;
-    });
+    const inRange = catItems;
     const map = new Map<string, { total: number; items: Expense[] }>();
     for (const e of inRange) {
       const g = map.get(e.category) || { total: 0, items: [] };
@@ -213,7 +272,7 @@ export function ExpensesScreen() {
     return [...map.entries()]
       .sort((a, b) => b[1].total - a[1].total)
       .map(([name, g]) => ({ name, ...g, pct: g.total / grandTotal }));
-  }, [expenses, rangeFrom, rangeTo]);
+  }, [catItems]);
 
   const rangeTotal = useMemo(
     () => catGroups.reduce((s, g) => s + g.total, 0),
@@ -274,214 +333,247 @@ export function ExpensesScreen() {
     </Pressable>
   );
 
+  const renderDayCard = (g: {
+    date: string;
+    total: number;
+    items: Expense[];
+  }) => {
+    const d = prettyDate(g.date);
+    const open = expandedDay === g.date;
+    return (
+      <View style={styles.dayCard}>
+        <Pressable
+          style={styles.dayHeader}
+          onPress={() => setExpandedDay(open ? null : g.date)}
+        >
+          <View style={styles.dateBadge}>
+            <Text style={styles.dateBadgeDay}>{d.weekday}</Text>
+            <Text style={styles.dateBadgeDate}>{d.dayMonth}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.textDim, fontSize: 12 }}>
+              {g.items.length} transaction{g.items.length > 1 ? "s" : ""}
+            </Text>
+            <Text style={styles.dayTotal}>{formatMoney(g.total)}</Text>
+          </View>
+          <Text style={styles.chevron}>{open ? "⌄" : "›"}</Text>
+        </Pressable>
+        {open && (
+          <View style={styles.dayItems}>
+            {g.items.map((e) => renderExpenseRow(e))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderCatCard = (g: {
+    name: string;
+    total: number;
+    items: Expense[];
+    pct: number;
+  }) => {
+    const open = expandedCat === g.name;
+    return (
+      <View style={styles.dayCard}>
+        <Pressable
+          style={styles.dayHeader}
+          onPress={() => setExpandedCat(open ? null : g.name)}
+        >
+          <View
+            style={[styles.catDotLg, { backgroundColor: catColor(g.name) }]}
+          >
+            <Text style={{ fontSize: 18 }}>{catIcon(g.name)}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.catTitleRow}>
+              <Text style={{ color: theme.text, fontWeight: "700" }}>
+                {g.name}
+              </Text>
+              <Text style={{ color: theme.text, fontWeight: "700" }}>
+                {formatMoney(g.total)}
+              </Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.max(g.pct * 100, 2)}%`,
+                    backgroundColor: catColor(g.name),
+                  },
+                ]}
+              />
+            </View>
+            <Text style={{ color: theme.textDim, fontSize: 11 }}>
+              {(g.pct * 100).toFixed(1)}% · {g.items.length} transaction
+              {g.items.length > 1 ? "s" : ""}
+            </Text>
+          </View>
+          <Text style={styles.chevron}>{open ? "⌄" : "›"}</Text>
+        </Pressable>
+        {open && (
+          <View style={styles.dayItems}>
+            {g.items.map((e) => renderExpenseRow(e, true))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const listHeader = (
+    <View>
+      {/* Today header card */}
+      <View style={styles.todayCard}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: theme.textDim, fontSize: 13 }}>
+            Today · {prettyDate(today).full}
+          </Text>
+          <Text style={styles.todayValue}>{formatMoney(todayTotal)}</Text>
+        </View>
+        <Pressable style={styles.scanBtn} onPress={load}>
+          <Text style={{ color: theme.text, fontWeight: "700" }}>
+            {loading ? "⧖" : "🔄"}
+          </Text>
+        </Pressable>
+        <Pressable style={styles.scanBtn} onPress={() => setScanOpen(true)}>
+          <Text style={{ color: theme.text, fontWeight: "700" }}>📸</Text>
+        </Pressable>
+        <Pressable style={styles.addBtn} onPress={openAdd}>
+          <Text style={{ color: "#0F172A", fontWeight: "700" }}>＋ Add</Text>
+        </Pressable>
+      </View>
+
+      {/* View switcher */}
+      <View style={styles.segment}>
+        {(
+          [
+            ["daily", "📅 Daily"],
+            ["category", "📂 By Category"],
+          ] as const
+        ).map(([key, label]) => (
+          <Pressable
+            key={key}
+            style={[styles.segmentBtn, view === key && styles.segmentActive]}
+            onPress={() => setView(key)}
+          >
+            <Text
+              style={{
+                color: view === key ? "#0F172A" : theme.textDim,
+                fontWeight: "700",
+                fontSize: 13,
+              }}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {view === "category" && (
+        <View style={styles.monthBar}>
+          <Pressable
+            style={styles.monthNavBtn}
+            onPress={() => {
+              const prev =
+                rangeFrom === rangeTo ? shiftMonth(rangeFrom, -1) : rangeFrom;
+              setRangeFrom(prev);
+              setRangeTo(prev);
+            }}
+          >
+            <Text style={styles.monthNavText}>‹</Text>
+          </Pressable>
+          <Pressable
+            style={{ flex: 1, alignItems: "center" }}
+            onPress={() => setRangePickerOpen(true)}
+          >
+            <Text style={{ color: theme.text, fontWeight: "700" }}>
+              {rangeLabel}
+            </Text>
+            <Text style={{ color: theme.textDim, fontSize: 11 }}>
+              Total {formatMoney(rangeTotal)} · tap to change range
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.monthNavBtn,
+              rangeFrom === rangeTo && rangeTo >= thisMonth && { opacity: 0.3 },
+            ]}
+            disabled={rangeFrom === rangeTo && rangeTo >= thisMonth}
+            onPress={() => {
+              const next =
+                rangeFrom === rangeTo ? shiftMonth(rangeTo, 1) : rangeTo;
+              setRangeFrom(next);
+              setRangeTo(next);
+            }}
+          >
+            <Text style={styles.monthNavText}>›</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {view === "daily" && dailyItems.length === 0 && !loading && (
+        <Text
+          style={{ color: theme.textDim, textAlign: "center", marginTop: 40 }}
+        >
+          No expenses yet. Add one!
+        </Text>
+      )}
+
+      {view === "category" && catGroups.length === 0 && !catLoading && (
+        <Text
+          style={{ color: theme.textDim, textAlign: "center", marginTop: 24 }}
+        >
+          No expenses in {rangeLabel}.
+        </Text>
+      )}
+    </View>
+  );
+
+  const listData: any[] = view === "daily" ? dayGroups : catGroups;
+
   return (
     <View style={styles.screen}>
       <Text style={styles.title}>Expenses</Text>
       {error && <Text style={styles.error}>{error}</Text>}
 
-      <ScrollView
+      <FlatList
+        data={listData}
+        keyExtractor={(item: any) => (view === "daily" ? item.date : item.name)}
+        renderItem={({ item }) =>
+          view === "daily" ? renderDayCard(item) : renderCatCard(item)
+        }
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={
+          view === "daily" && dailyItems.length > 0 ? (
+            loadingMore || dailyHasMore ? (
+              <LoadingDots />
+            ) : (
+              <Text style={styles.endNote}>— end of history —</Text>
+            )
+          ) : null
+        }
+        onEndReached={() => {
+          if (view === "daily") loadMore();
+        }}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={load}
+            refreshing={loading || catLoading}
+            onRefresh={() => {
+              load();
+              if (view === "category") loadCategory();
+            }}
             tintColor={theme.accent}
           />
         }
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
-      >
-        {/* Today header card */}
-        <View style={styles.todayCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.textDim, fontSize: 13 }}>
-              Today · {prettyDate(today).full}
-            </Text>
-            <Text style={styles.todayValue}>{formatMoney(todayTotal)}</Text>
-          </View>
-          <Pressable style={styles.scanBtn} onPress={load}>
-            <Text style={{ color: theme.text, fontWeight: "700" }}>
-              {loading ? "⧖" : "🔄"}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.scanBtn} onPress={() => setScanOpen(true)}>
-            <Text style={{ color: theme.text, fontWeight: "700" }}>📸</Text>
-          </Pressable>
-          <Pressable style={styles.addBtn} onPress={openAdd}>
-            <Text style={{ color: "#0F172A", fontWeight: "700" }}>＋ Add</Text>
-          </Pressable>
-        </View>
-
-        {/* View switcher */}
-        <View style={styles.segment}>
-          {(
-            [
-              ["daily", "📅 Daily"],
-              ["category", "📂 By Category"],
-            ] as const
-          ).map(([key, label]) => (
-            <Pressable
-              key={key}
-              style={[styles.segmentBtn, view === key && styles.segmentActive]}
-              onPress={() => setView(key)}
-            >
-              <Text
-                style={{
-                  color: view === key ? "#0F172A" : theme.textDim,
-                  fontWeight: "700",
-                  fontSize: 13,
-                }}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {expenses.length === 0 && !loading && (
-          <Text
-            style={{ color: theme.textDim, textAlign: "center", marginTop: 40 }}
-          >
-            No expenses yet. Add one!
-          </Text>
-        )}
-
-        {view === "category" && (
-          <View style={styles.monthBar}>
-            <Pressable
-              style={styles.monthNavBtn}
-              onPress={() => {
-                // single-month mode: step both; range mode: collapse to single month
-                const prev =
-                  rangeFrom === rangeTo ? shiftMonth(rangeFrom, -1) : rangeFrom;
-                setRangeFrom(prev);
-                setRangeTo(prev);
-              }}
-            >
-              <Text style={styles.monthNavText}>‹</Text>
-            </Pressable>
-            <Pressable
-              style={{ flex: 1, alignItems: "center" }}
-              onPress={() => setRangePickerOpen(true)}
-            >
-              <Text style={{ color: theme.text, fontWeight: "700" }}>
-                {rangeLabel}
-              </Text>
-              <Text style={{ color: theme.textDim, fontSize: 11 }}>
-                Total {formatMoney(rangeTotal)} · tap to change range
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.monthNavBtn,
-                rangeFrom === rangeTo &&
-                  rangeTo >= thisMonth && { opacity: 0.3 },
-              ]}
-              disabled={rangeFrom === rangeTo && rangeTo >= thisMonth}
-              onPress={() => {
-                const next =
-                  rangeFrom === rangeTo ? shiftMonth(rangeTo, 1) : rangeTo;
-                setRangeFrom(next);
-                setRangeTo(next);
-              }}
-            >
-              <Text style={styles.monthNavText}>›</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {view === "category" && catGroups.length === 0 && !loading && (
-          <Text
-            style={{ color: theme.textDim, textAlign: "center", marginTop: 24 }}
-          >
-            No expenses in {rangeLabel}.
-          </Text>
-        )}
-
-        {view === "daily"
-          ? dayGroups.map((g) => {
-              const d = prettyDate(g.date);
-              const open = expandedDay === g.date;
-              return (
-                <View key={g.date} style={styles.dayCard}>
-                  <Pressable
-                    style={styles.dayHeader}
-                    onPress={() => setExpandedDay(open ? null : g.date)}
-                  >
-                    <View style={styles.dateBadge}>
-                      <Text style={styles.dateBadgeDay}>{d.weekday}</Text>
-                      <Text style={styles.dateBadgeDate}>{d.dayMonth}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: theme.textDim, fontSize: 12 }}>
-                        {g.items.length} transaction
-                        {g.items.length > 1 ? "s" : ""}
-                      </Text>
-                      <Text style={styles.dayTotal}>
-                        {formatMoney(g.total)}
-                      </Text>
-                    </View>
-                    <Text style={styles.chevron}>{open ? "⌄" : "›"}</Text>
-                  </Pressable>
-                  {open && (
-                    <View style={styles.dayItems}>
-                      {g.items.map((e) => renderExpenseRow(e))}
-                    </View>
-                  )}
-                </View>
-              );
-            })
-          : catGroups.map((g) => {
-              const open = expandedCat === g.name;
-              return (
-                <View key={g.name} style={styles.dayCard}>
-                  <Pressable
-                    style={styles.dayHeader}
-                    onPress={() => setExpandedCat(open ? null : g.name)}
-                  >
-                    <View
-                      style={[
-                        styles.catDotLg,
-                        { backgroundColor: catColor(g.name) },
-                      ]}
-                    >
-                      <Text style={{ fontSize: 18 }}>{catIcon(g.name)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.catTitleRow}>
-                        <Text style={{ color: theme.text, fontWeight: "700" }}>
-                          {g.name}
-                        </Text>
-                        <Text style={{ color: theme.text, fontWeight: "700" }}>
-                          {formatMoney(g.total)}
-                        </Text>
-                      </View>
-                      <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            {
-                              width: `${Math.max(g.pct * 100, 2)}%`,
-                              backgroundColor: catColor(g.name),
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text style={{ color: theme.textDim, fontSize: 11 }}>
-                        {(g.pct * 100).toFixed(1)}% · {g.items.length}{" "}
-                        transaction{g.items.length > 1 ? "s" : ""}
-                      </Text>
-                    </View>
-                    <Text style={styles.chevron}>{open ? "⌄" : "›"}</Text>
-                  </Pressable>
-                  {open && (
-                    <View style={styles.dayItems}>
-                      {g.items.map((e) => renderExpenseRow(e, true))}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-      </ScrollView>
+        removeClippedSubviews
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={11}
+      />
 
       <Modal
         visible={modalOpen}
@@ -699,6 +791,12 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   segmentActive: { backgroundColor: theme.accent },
+  endNote: {
+    color: theme.textDim,
+    fontSize: 12,
+    textAlign: "center",
+    paddingVertical: 18,
+  },
   monthBar: {
     flexDirection: "row",
     alignItems: "center",

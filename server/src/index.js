@@ -22,6 +22,7 @@ app.use((req, res, next) => {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Expose-Headers", "X-Total-Count");
   if (req.method === "OPTIONS") return res.status(204).end();
   next();
 });
@@ -47,8 +48,16 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get(
   "/expenses",
   wrap(async (req, res) => {
-    const { from, to } = req.query;
-    res.json(await listExpenses({ from, to }));
+    const { from, to, limit, offset } = req.query;
+    const all = await listExpenses({ from, to });
+    const off = Number(offset) || 0;
+    const lim = limit !== undefined ? Number(limit) : undefined;
+    const items =
+      lim !== undefined && Number.isFinite(lim)
+        ? all.slice(off, off + lim)
+        : all.slice(off);
+    res.set("X-Total-Count", String(all.length));
+    res.json(items);
   }),
 );
 
