@@ -665,7 +665,7 @@ export function ExpensesScreen() {
                   onPress={() => confirmDelete(editing)}
                 >
                   <Text style={{ color: theme.danger, fontWeight: "700" }}>
-                    🗑  Delete expense
+                    🗑 Delete expense
                   </Text>
                 </Pressable>
               )}
