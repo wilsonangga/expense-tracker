@@ -3,6 +3,11 @@ import type { Expense, Category, Receipt } from "./types";
 
 const SETTINGS_KEY = "settings";
 
+const DEFAULT_SETTINGS: Settings = {
+  serverUrl: "https://catatan-keuangan-7eff.onrender.com",
+  apiKey: "7ac7484ae177ae6730c07f11af0360763e5c4eb94667001a",
+};
+
 export interface Settings {
   serverUrl: string;
   apiKey: string;
@@ -10,7 +15,12 @@ export interface Settings {
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-  return raw ? JSON.parse(raw) : { serverUrl: "", apiKey: "" };
+  if (!raw) return { ...DEFAULT_SETTINGS };
+  const saved = JSON.parse(raw) as Partial<Settings>;
+  return {
+    serverUrl: saved.serverUrl || DEFAULT_SETTINGS.serverUrl,
+    apiKey: saved.apiKey || DEFAULT_SETTINGS.apiKey,
+  };
 }
 
 export async function saveSettings(s: Settings): Promise<void> {
