@@ -7,6 +7,7 @@ import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { ExpensesScreen } from "./src/screens/ExpensesScreen";
 import { CategoriesScreen } from "./src/screens/CategoriesScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
+import { UpdateGate } from "./src/components/UpdateGate";
 import { theme } from "./src/theme";
 
 const Tab = createBottomTabNavigator();
@@ -33,6 +34,7 @@ export default function App() {
   return (
     <NavigationContainer theme={navTheme}>
       <StatusBar style="light" />
+      <UpdateGate />
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,
