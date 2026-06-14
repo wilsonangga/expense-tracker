@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   StyleSheet,
   Pressable,
   Modal,
@@ -582,73 +583,81 @@ export function ExpensesScreen() {
         onRequestClose={() => setModalOpen(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.modalWrap}
         >
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>
-              {editing ? "Edit expense" : "Add expense"}
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Amount (e.g. 25.000)"
-              placeholderTextColor={theme.textDim}
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={(t) => setAmount(formatAmountInput(t))}
-              autoFocus
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Note (optional)"
-              placeholderTextColor={theme.textDim}
-              value={note}
-              onChangeText={setNote}
-            />
-            <DateField value={date} onChange={setDate} />
-            <View style={styles.catWrap}>
-              {categories.map((c) => (
-                <Pressable
-                  key={c.name}
-                  style={[
-                    styles.catChip,
-                    category === c.name && { backgroundColor: c.color },
-                  ]}
-                  onPress={() => setCategory(c.name)}
-                >
-                  <Text
-                    style={{
-                      color: category === c.name ? "#fff" : theme.textDim,
-                      fontSize: 13,
-                    }}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.modalTitle}>
+                {editing ? "Edit expense" : "Add expense"}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Amount (e.g. 25.000)"
+                placeholderTextColor={theme.textDim}
+                keyboardType="numeric"
+                value={amount}
+                onChangeText={(t) => setAmount(formatAmountInput(t))}
+                autoFocus
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Note (optional)"
+                placeholderTextColor={theme.textDim}
+                value={note}
+                onChangeText={setNote}
+              />
+              <DateField value={date} onChange={setDate} />
+              <View style={styles.catWrap}>
+                {categories.map((c) => (
+                  <Pressable
+                    key={c.name}
+                    style={[
+                      styles.catChip,
+                      category === c.name && { backgroundColor: c.color },
+                    ]}
+                    onPress={() => setCategory(c.name)}
                   >
-                    {c.icon} {c.name}
+                    <Text
+                      style={{
+                        color: category === c.name ? "#fff" : theme.textDim,
+                        fontSize: 13,
+                      }}
+                    >
+                      {c.icon} {c.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                <Pressable
+                  style={[styles.btn, styles.btnGhost]}
+                  onPress={() => setModalOpen(false)}
+                >
+                  <Text style={{ color: theme.textDim, fontWeight: "600" }}>
+                    Cancel
                   </Text>
                 </Pressable>
-              ))}
-            </View>
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-              <Pressable
-                style={[styles.btn, styles.btnGhost]}
-                onPress={() => setModalOpen(false)}
-              >
-                <Text style={{ color: theme.textDim, fontWeight: "600" }}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.btn,
-                  { backgroundColor: theme.accent, opacity: saving ? 0.6 : 1 },
-                ]}
-                onPress={submit}
-                disabled={saving}
-              >
-                <Text style={{ color: "#0F172A", fontWeight: "700" }}>
-                  {saving ? "Saving…" : "Save"}
-                </Text>
-              </Pressable>
-            </View>
+                <Pressable
+                  style={[
+                    styles.btn,
+                    {
+                      backgroundColor: theme.accent,
+                      opacity: saving ? 0.6 : 1,
+                    },
+                  ]}
+                  onPress={submit}
+                  disabled={saving}
+                >
+                  <Text style={{ color: "#0F172A", fontWeight: "700" }}>
+                    {saving ? "Saving…" : "Save"}
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -910,6 +919,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    maxHeight: "85%",
   },
   modalTitle: {
     color: theme.text,
