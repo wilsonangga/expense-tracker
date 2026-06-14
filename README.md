@@ -11,6 +11,40 @@ app/      Expo mobile app
 server/   Node.js API + Telegram bot (Google Sheets backend)
 ```
 
+## Overview
+
+**Catatan Keuangan** is a personal finance app for tracking daily expenses without
+the friction of spreadsheets or heavyweight finance apps. It is built around three
+parts that share one Google Sheet as the single source of truth, so you always own
+your data.
+
+**What it does**
+
+- **Log expenses anywhere** — add them in the mobile app, or just message the
+  Telegram bot (e.g. `25000 lunch`, `food 25k nasi goreng`) without opening the app.
+- **Scan receipts** — snap or upload a photo of a bill and an AI vision model
+  (Google Gemini) extracts each item, price, service fee, and tax. You can then
+  split the bill and pick only the items you paid for, in the app or via Telegram.
+- **Interactive dashboard** — donut and bar charts with a range switcher
+  (7 days / 30 days / this month); tap a slice or bar to drill into a category or day.
+- **Custom categories** — create your own categories with icons and colors.
+- **Fast, paginated history** — the expense list loads in pages with infinite scroll
+  and a smooth loading animation, so thousands of transactions stay snappy.
+- **Over-the-air updates** — JS/TS changes ship instantly to installed apps via
+  EAS Update, with no Play Store or reinstall needed.
+
+**How it fits together**
+
+- **Mobile app** (Expo / React Native, TypeScript) — the main UI: dashboard,
+  expense list, categories, settings, and the receipt scanner.
+- **Backend** (Node.js + Express) — a small API secured with an API key, plus the
+  Telegram bot (grammY) and the Gemini receipt parser, all reading/writing the sheet.
+- **Storage** (Google Sheets) — two tabs, `Expenses` and `Categories`, that you own
+  and can open or edit by hand at any time.
+
+**Tech stack:** Expo / React Native, Node.js, Express, grammY (Telegram),
+Google Sheets API, Google Gemini, EAS Build & EAS Update.
+
 ## 1. Google Sheets setup
 
 1. Create a new Google Spreadsheet and copy its ID from the URL:
@@ -95,10 +129,10 @@ npx eas-cli update --branch preview --message "what changed"
 
 ### When to rebuild the APK vs. OTA update
 
-| Change                                   | Command                                                       |
-| ---------------------------------------- | ------------------------------------------------------------ |
-| JS/TS code (screens, logic, styles)      | `npx eas-cli update --branch preview -m "..."`               |
-| Icon, splash, native library, SDK bump   | `npx eas-cli build --platform android --profile preview`     |
+| Change                                 | Command                                                  |
+| -------------------------------------- | -------------------------------------------------------- |
+| JS/TS code (screens, logic, styles)    | `npx eas-cli update --branch preview -m "..."`           |
+| Icon, splash, native library, SDK bump | `npx eas-cli build --platform android --profile preview` |
 
 ## Using the Telegram bot
 
