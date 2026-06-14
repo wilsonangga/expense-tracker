@@ -14,7 +14,17 @@
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/28c6aba9-aee0-4854-b078-847e60f9b02e"
     },
-    "plugins": ["expo-splash-screen"],
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0F172A"
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.wilsonangga.catatankeuangan",
@@ -29,7 +39,7 @@
     "android": {
       "package": "com.wilsonangga.catatankeuangan",
       "usesCleartextTraffic": true,
-      "permissions": ["CAMERA", "CAMERA"],
+      "permissions": ["CAMERA"],
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png",
