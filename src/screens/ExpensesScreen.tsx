@@ -11,7 +11,6 @@ import {
   Alert,
   RefreshControl,
   KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api, formatMoney } from "../api";
@@ -88,6 +87,10 @@ export function ExpensesScreen() {
   const [date, setDate] = useState("");
   const [category, setCategory] = useState<string>("");
   const [saving, setSaving] = useState(false);
+
+  // custom delete confirmation
+  const [pendingDelete, setPendingDelete] = useState<Expense | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Initial load: categories + first page of expenses (newest first).
   const load = useCallback(async () => {
@@ -210,29 +213,25 @@ export function ExpensesScreen() {
   };
 
   const confirmDelete = (e: Expense) => {
-    Alert.alert(
-      "Delete expense",
-      `${formatMoney(e.amount)} — ${e.note || e.category}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.deleteExpense(e.id);
-              setDailyItems((prev) => prev.filter((x) => x.id !== e.id));
-              setCatItems((prev) => prev.filter((x) => x.id !== e.id));
-              setDailyTotal((t) => Math.max(0, t - 1));
-              setModalOpen(false);
-              setEditing(null);
-            } catch (err: any) {
-              Alert.alert("Error", err.message);
-            }
-          },
-        },
-      ],
-    );
+    setPendingDelete(e);
+  };
+
+  const performDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await api.deleteExpense(pendingDelete.id);
+      setDailyItems((prev) => prev.filter((x) => x.id !== pendingDelete.id));
+      setCatItems((prev) => prev.filter((x) => x.id !== pendingDelete.id));
+      setDailyTotal((t) => Math.max(0, t - 1));
+      setPendingDelete(null);
+      setModalOpen(false);
+      setEditing(null);
+    } catch (err: any) {
+      Alert.alert("Error", err.message);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const catIcon = (name: string) =>
@@ -585,7 +584,7 @@ export function ExpensesScreen() {
         onRequestClose={() => setModalOpen(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior="padding"
           style={styles.modalWrap}
         >
           <View style={styles.modal}>
@@ -740,6 +739,61 @@ export function ExpensesScreen() {
             >
               <Text style={{ color: "#0F172A", fontWeight: "700" }}>Done</Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Custom delete confirmation */}
+      <Modal
+        visible={!!pendingDelete}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !deleting && setPendingDelete(null)}
+      >
+        <Pressable
+          style={styles.confirmBackdrop}
+          onPress={() => !deleting && setPendingDelete(null)}
+        >
+          <Pressable style={styles.confirmCard} onPress={() => {}}>
+            <View style={styles.confirmIcon}>
+              <Text style={{ fontSize: 26 }}>🗑️</Text>
+            </View>
+            <Text style={styles.confirmTitle}>Delete expense?</Text>
+            {pendingDelete && (
+              <Text style={styles.confirmAmount}>
+                {formatMoney(pendingDelete.amount)}
+              </Text>
+            )}
+            {pendingDelete && (
+              <Text style={styles.confirmSub}>
+                {pendingDelete.note || pendingDelete.category} ·{" "}
+                {pendingDelete.category}
+              </Text>
+            )}
+            <Text style={styles.confirmWarn}>This action can’t be undone.</Text>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
+              <Pressable
+                style={[styles.btn, styles.btnGhost]}
+                onPress={() => setPendingDelete(null)}
+                disabled={deleting}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.btn,
+                  { backgroundColor: theme.danger, opacity: deleting ? 0.6 : 1 },
+                ]}
+                onPress={performDelete}
+                disabled={deleting}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>
+                  {deleting ? "Deleting…" : "Delete"}
+                </Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -962,5 +1016,52 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.danger,
+  },
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 28,
+  },
+  confirmCard: {
+    width: "100%",
+    backgroundColor: theme.card,
+    borderRadius: 20,
+    padding: 22,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  confirmIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(248,113,113,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  confirmTitle: {
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  confirmAmount: {
+    color: theme.danger,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  confirmSub: {
+    color: theme.textDim,
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: "center",
+  },
+  confirmWarn: {
+    color: theme.textDim,
+    fontSize: 12,
+    marginTop: 10,
   },
 });
