@@ -1,17 +1,31 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "Catatan Keuangan",
+    "slug": "catatan-keuangan",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0F172A",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wilsonangga.catatankeuangan",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos of receipts to scan expenses.",
+        "NSPhotoLibraryUsageDescription": "Pick receipt photos to scan expenses.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "android": {
+      "package": "com.wilsonangga.catatankeuangan",
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "CAMERA"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -20,6 +34,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "28c6aba9-aee0-4854-b078-847e60f9b02e"
+      }
+    },
+    "owner": "wilsonangga"
   }
 }
