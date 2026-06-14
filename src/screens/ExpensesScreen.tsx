@@ -10,7 +10,7 @@ import {
   TextInput,
   Alert,
   RefreshControl,
-  KeyboardAvoidingView,
+  Keyboard,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api, formatMoney } from "../api";
@@ -91,6 +91,22 @@ export function ExpensesScreen() {
   // custom delete confirmation
   const [pendingDelete, setPendingDelete] = useState<Expense | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // keyboard height to lift the bottom sheet without leaving a gap on close
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (e) =>
+      setKeyboardHeight(e.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardHeight(0),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Initial load: categories + first page of expenses (newest first).
   const load = useCallback(async () => {
@@ -583,11 +599,8 @@ export function ExpensesScreen() {
         transparent
         onRequestClose={() => setModalOpen(false)}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.modalWrap}
-        >
-          <View style={styles.modal}>
+        <View style={styles.modalWrap}>
+          <View style={[styles.modal, { paddingBottom: keyboardHeight }]}>
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -670,7 +683,7 @@ export function ExpensesScreen() {
               )}
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Month range picker */}
@@ -784,7 +797,10 @@ export function ExpensesScreen() {
               <Pressable
                 style={[
                   styles.btn,
-                  { backgroundColor: theme.danger, opacity: deleting ? 0.6 : 1 },
+                  {
+                    backgroundColor: theme.danger,
+                    opacity: deleting ? 0.6 : 1,
+                  },
                 ]}
                 onPress={performDelete}
                 disabled={deleting}
