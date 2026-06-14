@@ -21,9 +21,7 @@
     "android": {
       "package": "com.wilsonangga.catatankeuangan",
       "usesCleartextTraffic": true,
-      "permissions": [
-        "CAMERA"
-      ],
+      "permissions": ["CAMERA"],
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png",

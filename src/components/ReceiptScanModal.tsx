@@ -391,7 +391,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   stepText: { color: theme.text, fontSize: 14, fontWeight: "700" },
-  stepCount: { color: theme.textDim, fontSize: 12, minWidth: 30, textAlign: "center" },
+  stepCount: {
+    color: theme.textDim,
+    fontSize: 12,
+    minWidth: 30,
+    textAlign: "center",
+  },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
