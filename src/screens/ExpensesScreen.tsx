@@ -224,6 +224,8 @@ export function ExpensesScreen() {
               setDailyItems((prev) => prev.filter((x) => x.id !== e.id));
               setCatItems((prev) => prev.filter((x) => x.id !== e.id));
               setDailyTotal((t) => Math.max(0, t - 1));
+              setModalOpen(false);
+              setEditing(null);
             } catch (err: any) {
               Alert.alert("Error", err.message);
             }
@@ -657,6 +659,16 @@ export function ExpensesScreen() {
                   </Text>
                 </Pressable>
               </View>
+              {editing && (
+                <Pressable
+                  style={styles.deleteBtn}
+                  onPress={() => confirmDelete(editing)}
+                >
+                  <Text style={{ color: theme.danger, fontWeight: "700" }}>
+                    🗑  Delete expense
+                  </Text>
+                </Pressable>
+              )}
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -943,4 +955,12 @@ const styles = StyleSheet.create({
   },
   btn: { flex: 1, alignItems: "center", padding: 14, borderRadius: 10 },
   btnGhost: { backgroundColor: theme.cardAlt },
+  deleteBtn: {
+    marginTop: 12,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.danger,
+  },
 });
