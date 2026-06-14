@@ -341,7 +341,9 @@ export function ExpensesScreen() {
         </Text>
         <Text style={{ color: theme.textDim, fontSize: 12 }}>
           {item.category}
-          {showDate ? ` · ${item.date}` : ""}
+          {showDate
+            ? ` · ${prettyDate(item.date).dayMonth} ${new Date(item.date + "T00:00:00").getFullYear()}`
+            : ""}
           {item.source === "telegram" ? " · 🤖" : ""}
         </Text>
       </View>
@@ -1027,6 +1029,7 @@ const styles = StyleSheet.create({
   btnGhost: { backgroundColor: theme.cardAlt },
   deleteBtn: {
     marginTop: 12,
+    marginBottom: 20,
     alignItems: "center",
     paddingVertical: 12,
     borderRadius: 10,

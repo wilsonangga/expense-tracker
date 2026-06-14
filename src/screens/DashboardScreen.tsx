@@ -19,6 +19,26 @@ type Range = "7d" | "30d" | "month";
 const isoDaysAgo = (n: number) =>
   new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
+const MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const dayMonth = (iso: string) => {
+  const d = new Date(iso + "T00:00:00");
+  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+};
+
 export function DashboardScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -219,7 +239,7 @@ export function DashboardScreen() {
             <Text
               style={{ color: theme.textDim, marginRight: 8, fontSize: 12 }}
             >
-              {e.date.slice(5)}
+              {dayMonth(e.date)}
             </Text>
             <Text style={{ color: theme.text, fontWeight: "600" }}>
               {formatMoney(e.amount)}
