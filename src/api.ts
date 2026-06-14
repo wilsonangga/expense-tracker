@@ -60,7 +60,8 @@ export const api = {
     offset: number;
   }): Promise<{ items: Expense[]; total: number }> => {
     const { serverUrl, apiKey } = await loadSettings();
-    if (!serverUrl) throw new Error("Server URL not configured. Open Settings.");
+    if (!serverUrl)
+      throw new Error("Server URL not configured. Open Settings.");
     const q = new URLSearchParams();
     if (params.from) q.set("from", params.from);
     if (params.to) q.set("to", params.to);

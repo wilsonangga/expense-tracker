@@ -17,7 +17,13 @@ const G2 = "#0EA5E9"; // sky-500
  * @param {string}  o.ring   ring stroke color (or "url(#g)")
  * @param {string}  o.text   text color
  */
-function logoSVG({ size = 1024, plate = true, ring = "#FFFFFF", text = "#FFFFFF", pad = 0 } = {}) {
+function logoSVG({
+  size = 1024,
+  plate = true,
+  ring = "#FFFFFF",
+  text = "#FFFFFF",
+  pad = 0,
+} = {}) {
   const c = size / 2;
   const r = size * 0.3; // ring radius
   const sw = size * 0.12; // ring stroke width

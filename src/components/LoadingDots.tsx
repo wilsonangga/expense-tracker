@@ -7,7 +7,11 @@ import { theme } from "../theme";
  * Lightweight (Animated, native driver) so scrolling stays smooth.
  */
 export function LoadingDots({ label = "Loading more…" }: { label?: string }) {
-  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
+  const dots = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
 
   useEffect(() => {
     const animations = dots.map((d, i) =>
